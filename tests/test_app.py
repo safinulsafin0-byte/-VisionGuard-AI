@@ -60,3 +60,22 @@ def test_ui_styling_text_clarity_and_contrast_rules():
     assert "font-weight: 700;" in html_code or "font-weight: 800;" in html_code
 
 
+def test_streamlit_cloud_dependencies():
+    """Verify headless OpenCV and Linux OS dependencies for Streamlit Cloud deployment."""
+    import os
+
+    with open("requirements.txt", "r", encoding="utf-8") as f:
+        reqs = f.read()
+
+    assert "opencv-python-headless" in reqs, "opencv-python-headless must be specified for cloud deployment"
+    assert "opencv-python==" not in reqs, "Conflicting non-headless opencv-python must not be in requirements.txt"
+
+    assert os.path.exists("packages.txt"), "packages.txt must be present for Streamlit Cloud system libraries"
+    with open("packages.txt", "r", encoding="utf-8") as f:
+        pkgs = f.read()
+
+    assert "libgl1" in pkgs, "packages.txt must include libgl1"
+    assert "libglib2.0-0" in pkgs, "packages.txt must include libglib2.0-0"
+
+
+
