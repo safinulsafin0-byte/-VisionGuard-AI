@@ -307,6 +307,103 @@ def create_h264_video_writer(
     return None, ""
 
 
+def enable_mp4_faststart(data: bytes) -> bytes:
+    """Relocate the MP4 moov metadata atom to the beginning of the container (faststart).
+    
+    Standard OpenCV VideoWriter output places the moov atom at the end of the file
+    after all frame data in mdat. Web browsers and HTML5 video players cannot buffer,
+    seek, or determine stream duration until moov is parsed. This pure Python function
+    relocates moov immediately following ftyp and updates 32-bit (stco) and 64-bit (co64)
+    chunk offset tables so that browser video playback and scrub controls work instantly.
+    """
+    import struct
+
+    if not data or len(data) < 16:
+        return data
+
+    offset = 0
+    atoms = []
+    moov_atom = None
+    moov_offset = None
+    mdat_offset = None
+
+    while offset < len(data):
+        if offset + 8 > len(data):
+            break
+        size, btype = struct.unpack(">I4s", data[offset : offset + 8])
+        if size == 0:
+            size = len(data) - offset
+        elif size == 1:
+            if offset + 16 > len(data):
+                break
+            size = struct.unpack(">Q", data[offset + 8 : offset + 16])[0]
+
+        name = btype.decode("latin1", errors="replace")
+        atoms.append((name, offset, size))
+        if name == "moov":
+            moov_atom = data[offset : offset + size]
+            moov_offset = offset
+        elif name == "mdat" and mdat_offset is None:
+            mdat_offset = offset
+        offset += size
+
+    if not moov_atom or moov_offset is None or mdat_offset is None or moov_offset < mdat_offset:
+        return data
+
+    shift = len(moov_atom)
+    moov_ba = bytearray(moov_atom)
+
+    def patch_stco(sub_ba: bytearray, sub_offset: int, sub_len: int) -> None:
+        curr = sub_offset
+        end = sub_offset + sub_len
+        while curr < end:
+            if curr + 8 > end:
+                break
+            sz, bt = struct.unpack(">I4s", sub_ba[curr : curr + 8])
+            if sz == 0:
+                sz = end - curr
+            elif sz == 1:
+                if curr + 16 > end:
+                    break
+                sz = struct.unpack(">Q", sub_ba[curr + 8 : curr + 16])[0]
+            bname = bt.decode("latin1", errors="replace")
+            if bname in ["trak", "mdia", "minf", "stbl"]:
+                patch_stco(sub_ba, curr + 8, sz - 8)
+            elif bname == "stco":
+                if curr + 16 <= end:
+                    entry_count = struct.unpack(">I", sub_ba[curr + 12 : curr + 16])[0]
+                    for i in range(entry_count):
+                        pos = curr + 16 + i * 4
+                        if pos + 4 <= end:
+                            old_offset = struct.unpack(">I", sub_ba[pos : pos + 4])[0]
+                            sub_ba[pos : pos + 4] = struct.pack(">I", old_offset + shift)
+            elif bname == "co64":
+                if curr + 16 <= end:
+                    entry_count = struct.unpack(">I", sub_ba[curr + 12 : curr + 16])[0]
+                    for i in range(entry_count):
+                        pos = curr + 16 + i * 8
+                        if pos + 8 <= end:
+                            old_offset = struct.unpack(">Q", sub_ba[pos : pos + 8])[0]
+                            sub_ba[pos : pos + 8] = struct.pack(">Q", old_offset + shift)
+            curr += sz
+
+    patch_stco(moov_ba, 8, len(moov_ba) - 8)
+
+    out = bytearray()
+    for name, off, sz in atoms:
+        if name == "ftyp":
+            out.extend(data[off : off + sz])
+            break
+
+    out.extend(moov_ba)
+
+    for name, off, sz in atoms:
+        if name not in ["ftyp", "moov"]:
+            out.extend(data[off : off + sz])
+
+    return bytes(out)
+
+
 def generate_annotated_video_bytes(
     video_bytes: bytes,
     filename: Optional[str] = None,
@@ -404,7 +501,10 @@ def generate_annotated_video_bytes(
             return None
 
         with open(out_temp_path, "rb") as f_out:
-            annotated_bytes = f_out.read()
+            raw_annotated_bytes = f_out.read()
+
+        # Optimize container for instant web playback and timeline scrubbing
+        annotated_bytes = enable_mp4_faststart(raw_annotated_bytes)
 
         return annotated_bytes
 

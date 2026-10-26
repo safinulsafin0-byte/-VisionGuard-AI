@@ -189,6 +189,13 @@ def test_annotated_video_h264_playback_and_seeking():
     assert annotated_bytes is not None, "Annotated video generation returned None"
     assert len(annotated_bytes) > 2000, "Annotated video payload is suspiciously small"
 
+    # Faststart verification: moov metadata atom MUST precede mdat payload for web streaming
+    moov_pos = annotated_bytes.find(b"moov")
+    mdat_pos = annotated_bytes.find(b"mdat")
+    assert moov_pos != -1, "moov atom missing from annotated video container"
+    assert mdat_pos != -1, "mdat atom missing from annotated video container"
+    assert moov_pos < mdat_pos, f"moov atom ({moov_pos}) must precede mdat atom ({mdat_pos}) for faststart playback"
+
     # Write to a temporary file to simulate in-app playback and verify container integrity
     temp_path = None
     try:
@@ -238,5 +245,41 @@ def test_annotated_video_h264_playback_and_seeking():
                 os.remove(temp_path)
             except OSError:
                 pass
+
+
+def test_enable_mp4_faststart_relocation():
+    """Verify that enable_mp4_faststart correctly reorganizes top-level boxes and shifts chunk offsets."""
+    from visionguard.video import enable_mp4_faststart
+
+    # Test edge cases: empty or truncated payload
+    assert enable_mp4_faststart(b"") == b""
+    assert enable_mp4_faststart(b"short") == b"short"
+
+    # Generate synthetic video bytes (OpenCV VideoWriter natively outputs mdat before moov)
+    raw_vid_bytes, _ = create_synthetic_video_bytes(num_frames=10, fps=10, width=160, height=120)
+    raw_moov = raw_vid_bytes.find(b"moov")
+    raw_mdat = raw_vid_bytes.find(b"mdat")
+
+    # In raw OpenCV output, mdat typically precedes moov
+    if raw_mdat != -1 and raw_moov != -1 and raw_moov > raw_mdat:
+        fast_bytes = enable_mp4_faststart(raw_vid_bytes)
+        fast_moov = fast_bytes.find(b"moov")
+        fast_mdat = fast_bytes.find(b"mdat")
+        assert fast_moov < fast_mdat, "enable_mp4_faststart failed to place moov before mdat"
+
+        # Verify that OpenCV can open and read frames from the relocated stream
+        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tf:
+            tf.write(fast_bytes)
+            p = tf.name
+        try:
+            cap = cv2.VideoCapture(p)
+            assert cap.isOpened()
+            ret, frame = cap.read()
+            assert ret is True and frame is not None
+            cap.release()
+        finally:
+            if os.path.exists(p):
+                os.remove(p)
+
 
 

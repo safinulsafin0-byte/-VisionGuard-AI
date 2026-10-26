@@ -6,6 +6,7 @@ for both still images and video sequences.
 """
 
 from datetime import datetime, timezone
+import base64
 import io
 import os
 import platform
@@ -786,6 +787,7 @@ def main():
                 st.session_state["selected_kf_idx"] = 0
                 st.session_state["annotated_video_bytes"] = None
                 st.session_state["annotated_video_path"] = None
+                st.session_state["annotated_video_data_url"] = None
             except VideoProcessingError as vpe:
                 st.error(f"**Video Ingestion Rejected**: {str(vpe)}")
                 return
@@ -868,6 +870,7 @@ def main():
             st.session_state["selected_kf_idx"] = 0
             st.session_state["annotated_video_bytes"] = None
             st.session_state["annotated_video_path"] = None
+            st.session_state["annotated_video_data_url"] = None
             st.rerun()
 
         if finish_btn:
@@ -1052,6 +1055,8 @@ def main():
                                 st.session_state["annotated_video_bytes"] = annotated_vid
                                 ann_filename = f"visionguard_annotated_{os.path.splitext(uploaded_video.name)[0]}.mp4"
                                 st.session_state["annotated_video_filename"] = ann_filename
+                                b64_ann = base64.b64encode(annotated_vid).decode("ascii")
+                                st.session_state["annotated_video_data_url"] = f"data:video/mp4;base64,{b64_ann}"
                                 try:
                                     scratch_dir = os.path.join(tempfile.gettempdir(), "visionguard_scratch")
                                     os.makedirs(scratch_dir, exist_ok=True)
@@ -1069,12 +1074,15 @@ def main():
                                 )
                     else:
                         st.success("✓ Annotated H.264 overlay video generated successfully! Use the playback controls below to play, pause, and seek:")
-                        ann_source = (
-                            st.session_state["annotated_video_path"]
-                            if st.session_state.get("annotated_video_path") and os.path.exists(st.session_state["annotated_video_path"])
-                            else st.session_state["annotated_video_bytes"]
-                        )
-                        # In-app native video player with play, pause, seek, volume, and fullscreen
+                        ann_bytes = st.session_state["annotated_video_bytes"]
+                        ann_data_url = st.session_state.get("annotated_video_data_url")
+                        if not ann_data_url and ann_bytes:
+                            b64_ann = base64.b64encode(ann_bytes).decode("ascii")
+                            ann_data_url = f"data:video/mp4;base64,{b64_ann}"
+                            st.session_state["annotated_video_data_url"] = ann_data_url
+
+                        # In-app native video player using faststart data URI for zero-latency progressive playback and seeking
+                        ann_source = ann_data_url if (ann_data_url and len(ann_bytes) <= 30 * 1024 * 1024) else ann_bytes
                         st.video(ann_source, format="video/mp4", autoplay=False)
 
                         ann_btn_col1, ann_btn_col2, ann_btn_col3 = st.columns([2, 1, 1])
@@ -1093,11 +1101,13 @@ def main():
                             if st.button("🔄 Re-generate", key="btn_regen_annotated", use_container_width=True):
                                 st.session_state["annotated_video_bytes"] = None
                                 st.session_state["annotated_video_path"] = None
+                                st.session_state["annotated_video_data_url"] = None
                                 st.rerun()
                         with ann_btn_col3:
                             if st.button("❌ Clear Video", key="btn_clear_annotated", use_container_width=True):
                                 st.session_state["annotated_video_bytes"] = None
                                 st.session_state["annotated_video_path"] = None
+                                st.session_state["annotated_video_data_url"] = None
                                 st.rerun()
 
                 # Export section
