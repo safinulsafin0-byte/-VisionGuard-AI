@@ -175,7 +175,31 @@
   - `python -m pytest -v`: **44 of 44 tests passing in 1.11s**.
   - `python evaluate.py`: 24 synthetic assets evaluated, 100% precision, 100% recall, 7.48ms mean latency.
 
-## Phase K: Bug Fix & Unification of Schema v1.3.0 Report Generation Pipeline
+## Phase L: Fix Annotated Video In-App Playback & H.264 Encoder Negotiation
+- **Timestamp:** 2026-10-27T01:54:00+06:00
+- **Identified Failure:**
+  - The annotated video was generated and downloadable, but could not be played inside the app (`HTMLMediaElement` failed decoding or showed a black screen/error).
+  - Furthermore, clicking play, pause, or seeking caused the video player component to vanish from the screen.
+- **Root Cause Analysis:**
+  1. *Unsupported Web Codec (`mp4v`)*: `generate_annotated_video_bytes` in `visionguard/video.py` used `cv2.VideoWriter_fourcc(*"mp4v")`. This produced an MPEG-4 Part 2 stream (`FMP4`), which modern web browsers (Chrome, Edge, Firefox, Safari) cannot decode natively via HTML5 `<video>`. HTML5 video players strictly require H.264 (`avc1`), VP8/VP9, or AV1.
+  2. *Ephemeral Button Scope in Streamlit*: In `app.py`, the player was rendered inside `if st.button("Generate Annotated Video Overlay")`. Because `annotated_vid` was stored only in a local variable, any user interaction with the video player (play, pause, scrub seek bar) triggered a Streamlit script rerun, where `st.button` evaluated to `False`, immediately unmounting and destroying the video player.
+  3. *H.264 Macroblock Alignment*: H.264 video encoders require even pixel dimensions for standard macroblock alignment. Odd dimensions caused encoder rejects on certain backends.
+- **Architectural Implementation:**
+  1. *Native H.264 Encoder Negotiation (`create_h264_video_writer`)*:
+     - Implemented backend and FOURCC priority negotiation in `visionguard/video.py`:
+       - On Windows: Uses Microsoft Media Foundation (`cv2.CAP_MSMF`) with `avc1` / `H264` to generate true hardware-accelerated H.264 streams (`ftypmp42` container with `avc1` visual track).
+       - Cross-platform fallbacks: `(None, "avc1")`, `(None, "H264")`, `(None, "X264")`, and `(None, "mp4v")`.
+     - Enforced even width and height macroblock alignment (`width & ~1`, `height & ~1`) with frame resizing safeguards.
+  2. *Persistent In-App Playback Console in `app.py`*:
+     - Stored generated video bytes in `st.session_state["annotated_video_bytes"]` and cached scratch path in `st.session_state["annotated_video_path"]`.
+     - Reset state cleanly upon new video upload or inspection reset.
+     - Embedded native `st.video()` player with full visible controls (play, pause, scrubber seek bar, volume, fullscreen). The player persists across all user interactions without unmounting.
+     - Added controls for download, re-generation, and clearing.
+  3. *Automated Playback and Seek Verification*:
+     - Added `test_annotated_video_h264_playback_and_seeking` in `tests/test_video.py` verifying container integrity, H.264 FOURCC, frame decoding, forward seeking (1000ms), and backward seeking (200ms).
+- **Verification Evidence:**
+  - `python -m pytest -v`: **51 passed, 1 skipped in 1.78s** (all 52 tests passing/accounted for).
+
 - **Timestamp:** 2026-10-27T01:36:00+06:00
 - **Identified Critical Crash:**
   - `app.py`, line 737: `cov_stat = report_dict["coverage_statistics"]` crashed with `KeyError: 'coverage_statistics'` upon reaching the Consolidated Final Inspection Report section.

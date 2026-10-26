@@ -785,6 +785,8 @@ def main():
                 st.session_state["inspection_finished"] = False
                 st.session_state["consolidated_report"] = None
                 st.session_state["selected_kf_idx"] = 0
+                st.session_state["annotated_video_bytes"] = None
+                st.session_state["annotated_video_path"] = None
             except VideoProcessingError as vpe:
                 st.error(f"**Video Ingestion Rejected**: {str(vpe)}")
                 return
@@ -865,6 +867,8 @@ def main():
             st.session_state["inspection_finished"] = False
             st.session_state["consolidated_report"] = None
             st.session_state["selected_kf_idx"] = 0
+            st.session_state["annotated_video_bytes"] = None
+            st.session_state["annotated_video_path"] = None
             st.rerun()
 
         if finish_btn:
@@ -1029,33 +1033,73 @@ def main():
                     unsafe_allow_html=True,
                 )
 
-                # Optional Annotated Video Overlay Generation
-                with st.expander("🎞️ Annotated Video Overlay (Full Sequence Processing)", expanded=False):
-                    st.caption(
-                        "Optionally generate an annotated MP4 video with OpenCV candidate region overlays and timestamps rendered across frames."
-                    )
-                    if st.button("Generate Annotated Video Overlay", key="btn_render_annotated"):
-                        with st.spinner("Rendering OpenCV overlays onto video stream..."):
-                            annotated_vid = generate_annotated_video_bytes(
-                                video_bytes=video_bytes,
-                                filename=uploaded_video.name,
-                                thresholds=thresholds,
-                            )
-                        if annotated_vid is not None:
-                            st.success("Annotated overlay video rendered successfully!")
-                            st.video(annotated_vid, format="video/mp4", autoplay=False)
+                # Annotated Video Overlay Generation & In-App Playback
+                has_annotated = st.session_state.get("annotated_video_bytes") is not None
+                with st.expander("🎞️ Annotated Video Overlay (Full Sequence Processing & In-App Playback)", expanded=has_annotated):
+                    if not has_annotated:
+                        st.caption(
+                            "Generate a full-sequence annotated MP4 video with OpenCV bounding boxes, heuristic notices, "
+                            "and timestamps rendered directly onto each frame using hardware-accelerated H.264 encoding. "
+                            "Once generated, the video can be played, paused, and scrubbed directly in the app."
+                        )
+                        if st.button("🎞️ Generate Annotated Video (H.264 MP4)", key="btn_render_annotated", type="primary", use_container_width=True):
+                            with st.spinner("Encoding OpenCV bounding box overlays into web-playable H.264 MP4 stream..."):
+                                annotated_vid = generate_annotated_video_bytes(
+                                    video_bytes=video_bytes,
+                                    filename=uploaded_video.name,
+                                    thresholds=thresholds,
+                                )
+                            if annotated_vid is not None:
+                                st.session_state["annotated_video_bytes"] = annotated_vid
+                                ann_filename = f"visionguard_annotated_{os.path.splitext(uploaded_video.name)[0]}.mp4"
+                                st.session_state["annotated_video_filename"] = ann_filename
+                                try:
+                                    scratch_dir = os.path.join(tempfile.gettempdir(), "visionguard_scratch")
+                                    os.makedirs(scratch_dir, exist_ok=True)
+                                    temp_ann_path = os.path.join(scratch_dir, ann_filename)
+                                    with open(temp_ann_path, "wb") as f_scratch:
+                                        f_scratch.write(annotated_vid)
+                                    st.session_state["annotated_video_path"] = temp_ann_path
+                                except Exception:
+                                    st.session_state["annotated_video_path"] = None
+                                st.rerun()
+                            else:
+                                st.warning(
+                                    "Annotated video encoding is unavailable on this host environment's OpenCV video codecs. "
+                                    "Keyframe sequence inspection and frame downloads remain fully operational."
+                                )
+                    else:
+                        st.success("✓ Annotated H.264 overlay video generated successfully! Use the playback controls below to play, pause, and seek:")
+                        ann_source = (
+                            st.session_state["annotated_video_path"]
+                            if st.session_state.get("annotated_video_path") and os.path.exists(st.session_state["annotated_video_path"])
+                            else st.session_state["annotated_video_bytes"]
+                        )
+                        # In-app native video player with play, pause, seek, volume, and fullscreen
+                        st.video(ann_source, format="video/mp4", autoplay=False)
+
+                        ann_btn_col1, ann_btn_col2, ann_btn_col3 = st.columns([2, 1, 1])
+                        with ann_btn_col1:
                             st.download_button(
                                 label="📥 Download Annotated Video (MP4)",
-                                data=annotated_vid,
-                                file_name=f"visionguard_annotated_{os.path.splitext(uploaded_video.name)[0]}.mp4",
+                                data=st.session_state["annotated_video_bytes"],
+                                file_name=st.session_state.get(
+                                    "annotated_video_filename",
+                                    f"visionguard_annotated_{os.path.splitext(uploaded_video.name)[0]}.mp4",
+                                ),
                                 mime="video/mp4",
                                 use_container_width=True,
                             )
-                        else:
-                            st.warning(
-                                "Annotated video encoding is unavailable on this host environment's OpenCV video codecs. "
-                                "Keyframe sequence inspection and frame downloads remain fully operational."
-                            )
+                        with ann_btn_col2:
+                            if st.button("🔄 Re-generate", key="btn_regen_annotated", use_container_width=True):
+                                st.session_state["annotated_video_bytes"] = None
+                                st.session_state["annotated_video_path"] = None
+                                st.rerun()
+                        with ann_btn_col3:
+                            if st.button("❌ Clear Video", key="btn_clear_annotated", use_container_width=True):
+                                st.session_state["annotated_video_bytes"] = None
+                                st.session_state["annotated_video_path"] = None
+                                st.rerun()
 
                 # Export section
                 st.markdown("#### Export Consolidated Audit & Media")

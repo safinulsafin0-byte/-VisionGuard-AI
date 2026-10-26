@@ -163,13 +163,80 @@ def test_annotated_video_overlay_generation():
     mp4_bytes, _ = create_synthetic_video_bytes(codec_fourcc="mp4v", extension=".mp4", num_frames=6)
     annotated = generate_annotated_video_bytes(mp4_bytes, filename="annotated_test.mp4", max_frames_to_process=6)
 
-    # Annotated video should either succeed and return valid bytes, or return None gracefully
-    if annotated is not None:
-        assert isinstance(annotated, bytes)
-        assert len(annotated) > 0
-        assert len(annotated) >= 1000
+    # Annotated video should succeed and return valid bytes
+    assert annotated is not None
+    assert isinstance(annotated, bytes)
+    assert len(annotated) > 1000
 
     # Corrupt payload should return None without crashing
     bad_res = generate_annotated_video_bytes(b"invalid corrupt bytes", filename="bad.mp4")
     assert bad_res is None
+
+
+def test_annotated_video_h264_playback_and_seeking():
+    """Verify that generated annotated video is a valid playable MP4 with seek capability."""
+    import sys
+    from visionguard.video import generate_annotated_video_bytes
+
+    # Generate synthetic video clip with 20 frames at 10 fps (2.0s duration)
+    vid_bytes, _ = create_synthetic_video_bytes(num_frames=20, fps=10, width=320, height=240)
+    annotated_bytes = generate_annotated_video_bytes(
+        vid_bytes,
+        filename="clip_playback_test.mp4",
+        max_frames_to_process=20,
+    )
+
+    assert annotated_bytes is not None, "Annotated video generation returned None"
+    assert len(annotated_bytes) > 2000, "Annotated video payload is suspiciously small"
+
+    # Write to a temporary file to simulate in-app playback and verify container integrity
+    temp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tf:
+            tf.write(annotated_bytes)
+            temp_path = tf.name
+
+        cap = cv2.VideoCapture(temp_path)
+        assert cap.isOpened(), "Failed to open generated annotated video container"
+
+        frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+        assert frame_count >= 15, f"Expected at least 15 frames, got {frame_count}"
+        assert fps > 0, "FPS must be positive"
+        assert w == 320 and h == 240, f"Unexpected dimensions: {w}x{h}"
+
+        # On Windows, verify native H.264 stream encoding
+        if sys.platform == "win32":
+            fcc = int(cap.get(cv2.CAP_PROP_FOURCC))
+            fcc_str = "".join([chr((fcc >> 8 * i) & 0xFF) for i in range(4)]).lower()
+            assert fcc_str in ["h264", "avc1", "mp4v"], f"Unexpected codec fourcc: {fcc_str}"
+
+        # Test playback and frame reading
+        ret, frame1 = cap.read()
+        assert ret is True, "Failed to read first frame from annotated video"
+        assert frame1 is not None and frame1.shape == (240, 320, 3)
+
+        # Test pause & seeking: seek to 1.0 second (1000 ms)
+        cap.set(cv2.CAP_PROP_POS_MSEC, 1000.0)
+        ret_seek, frame_seek = cap.read()
+        assert ret_seek is True, "Seeking to 1000ms failed"
+        assert frame_seek is not None
+
+        # Test seek backward to 200 ms
+        cap.set(cv2.CAP_PROP_POS_MSEC, 200.0)
+        ret_rewind, frame_rewind = cap.read()
+        assert ret_rewind is True, "Seeking backward to 200ms failed"
+        assert frame_rewind is not None
+
+        cap.release()
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
+
 

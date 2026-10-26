@@ -259,13 +259,61 @@ def get_video_mime_type(filename_or_ext: str) -> str:
     return "video/mp4"
 
 
+def create_h264_video_writer(
+    output_path: str,
+    fps: float,
+    width: int,
+    height: int,
+) -> Tuple[Optional[cv2.VideoWriter], str]:
+    """Create a VideoWriter targeting web-playable H.264 MP4 with optimal backend negotiation.
+    
+    Returns:
+        (writer, selected_fourcc_str) or (None, "") if no suitable encoder opens.
+    """
+    import sys
+
+    # Candidate backend and fourcc pairings ordered by web browser compatibility
+    candidates = []
+
+    # On Windows, Microsoft Media Foundation (MSMF) natively encodes hardware-accelerated H.264
+    if sys.platform == "win32" and hasattr(cv2, "CAP_MSMF"):
+        candidates.append((cv2.CAP_MSMF, "avc1"))
+        candidates.append((cv2.CAP_MSMF, "H264"))
+
+    # Universal avc1 / H264 via default backend (FFMPEG or system GStreamer)
+    candidates.append((None, "avc1"))
+    candidates.append((None, "H264"))
+    candidates.append((None, "X264"))
+
+    # On Windows MSMF, mp4v also writes using the system's H.264/MP4 MFT
+    if sys.platform == "win32" and hasattr(cv2, "CAP_MSMF"):
+        candidates.append((cv2.CAP_MSMF, "mp4v"))
+
+    # Final fallback to standard mp4v
+    candidates.append((None, "mp4v"))
+
+    for backend, fourcc_str in candidates:
+        try:
+            fourcc = cv2.VideoWriter_fourcc(*fourcc_str)
+            if backend is not None:
+                writer = cv2.VideoWriter(output_path, backend, fourcc, fps, (width, height))
+            else:
+                writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+            if writer is not None and writer.isOpened():
+                return writer, fourcc_str
+        except Exception:
+            continue
+
+    return None, ""
+
+
 def generate_annotated_video_bytes(
     video_bytes: bytes,
     filename: Optional[str] = None,
     thresholds: Any = None,
-    max_frames_to_process: int = 120,
+    max_frames_to_process: int = 150,
 ) -> Optional[bytes]:
-    """Render OpenCV candidate region annotations across video frames and encode to downloadable MP4.
+    """Render OpenCV candidate region annotations across video frames and encode to playable H.264 MP4.
     
     Args:
         video_bytes: Raw bytes of the uploaded video.
@@ -274,7 +322,7 @@ def generate_annotated_video_bytes(
         max_frames_to_process: Cap on total frames to annotate for responsive performance.
         
     Returns:
-        Bytes of the annotated MP4 video, or None if encoding fails or codecs are unavailable.
+        Bytes of the annotated H.264 MP4 video, or None if encoding fails or codecs are unavailable.
     """
     from visionguard.analysis import analyze_image
     from visionguard.config import InspectionThresholds
@@ -299,19 +347,22 @@ def generate_annotated_video_bytes(
 
         raw_fps = cap.get(cv2.CAP_PROP_FPS)
         fps = 25.0 if (raw_fps <= 0.0 or np.isnan(raw_fps) or np.isinf(raw_fps)) else float(raw_fps)
-        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        raw_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        raw_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-        if width <= 0 or height <= 0:
+        if raw_width <= 0 or raw_height <= 0:
             cap.release()
             return None
+
+        # Ensure even dimensions for H.264 macroblock alignment
+        width = raw_width if raw_width % 2 == 0 else raw_width - 1
+        height = raw_height if raw_height % 2 == 0 else raw_height - 1
 
         with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tf_out:
             out_temp_path = tf_out.name
 
-        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-        writer = cv2.VideoWriter(out_temp_path, fourcc, fps, (width, height))
-        if not writer.isOpened():
+        writer, used_codec = create_h264_video_writer(out_temp_path, fps, width, height)
+        if writer is None or not writer.isOpened():
             cap.release()
             return None
 
@@ -321,17 +372,21 @@ def generate_annotated_video_bytes(
             if not ret or frame_bgr is None:
                 break
 
+            # Resize if dimensions needed macroblock alignment
+            if frame_bgr.shape[1] != width or frame_bgr.shape[0] != height:
+                frame_bgr = cv2.resize(frame_bgr, (width, height))
+
             # Analyze frame with OpenCV pipeline
             res = analyze_image(frame_bgr, thresholds=thresholds)
             annotated_rgb = annotate_candidate_regions(res.image_rgb, res.candidate_regions)
             annotated_bgr = cv2.cvtColor(annotated_rgb, cv2.COLOR_RGB2BGR)
 
-            # Add timestamp badge
+            # Add timestamp badge and candidate count overlay
             time_sec = frames_written / fps
             cv2.putText(
                 annotated_bgr,
-                f"t={time_sec:.2f}s | {len(res.candidate_regions)} candidate(s)",
-                (12, max(24, int(height * 0.05))),
+                f"t={time_sec:.2f}s | {len(res.candidate_regions)} candidate(s) flagged",
+                (12, max(24, int(height * 0.06))),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.6,
                 (0, 255, 255),
