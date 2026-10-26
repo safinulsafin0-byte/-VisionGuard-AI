@@ -72,97 +72,321 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Custom styling for high-contrast engineering tool aesthetics
+# Custom styling for crystal-clear, high-contrast engineering aesthetics
 st.markdown(
     """
     <style>
+    /* Global Typography & Contrast Reset */
+    * {
+        text-shadow: none !important;
+        -webkit-font-smoothing: antialiased !important;
+        -moz-osx-font-smoothing: grayscale !important;
+    }
+    *, *::before, *::after {
+        filter: none !important;
+        backdrop-filter: none !important;
+    }
+
+    /* Base Headings & Text */
+    h1, h2, h3, h4, h5, h6,
+    .stMarkdown h1, .stMarkdown h2, .stMarkdown h3,
+    .stMarkdown h4, .stMarkdown h5, .stMarkdown h6 {
+        color: #0f172a !important;
+        font-weight: 700 !important;
+        letter-spacing: -0.015em !important;
+        opacity: 1 !important;
+    }
+    p, span, li, label, div,
+    .stMarkdown p, .stMarkdown span, .stMarkdown li, .stMarkdown div {
+        color: #0f172a !important;
+        font-weight: 500 !important;
+        opacity: 1 !important;
+    }
+    strong, b, .stMarkdown strong {
+        color: #0f172a !important;
+        font-weight: 800 !important;
+    }
+
+    /* Clear, High-Contrast Captions */
+    [data-testid="stCaptionContainer"], .stCaption, small {
+        color: #1e293b !important;
+        font-size: 0.88rem !important;
+        font-weight: 600 !important;
+        line-height: 1.4 !important;
+        opacity: 1 !important;
+    }
+
+    /* Application Header */
     .vg-header {
-        font-size: 2.1rem;
-        font-weight: 700;
-        letter-spacing: -0.02em;
-        margin-bottom: 0.2rem;
-        color: #111827;
+        font-size: 2.25rem;
+        font-weight: 800;
+        letter-spacing: -0.025em;
+        margin-bottom: 0.25rem;
+        color: #0f172a !important;
     }
     .vg-sub {
         font-size: 1.05rem;
-        color: #4b5563;
-        margin-bottom: 1.2rem;
+        font-weight: 600;
+        color: #1e293b !important;
+        margin-bottom: 1.25rem;
+        line-height: 1.5;
     }
+
+    /* Quality Indicator Metric Cards */
     .metric-card {
-        background-color: #f9fafb;
-        border: 1px solid #e5e7eb;
-        border-radius: 8px;
-        padding: 12px 16px;
-        margin-bottom: 8px;
+        background-color: #ffffff !important;
+        border: 2px solid #cbd5e1 !important;
+        border-radius: 8px !important;
+        padding: 14px 18px !important;
+        margin-bottom: 10px !important;
+        box-shadow: none !important;
     }
     .metric-label {
-        font-size: 0.82rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-        color: #6b7280;
+        font-size: 0.82rem !important;
+        font-weight: 800 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.05em !important;
+        color: #1e293b !important;
+        margin-bottom: 4px !important;
     }
     .metric-val {
-        font-size: 1.5rem;
-        font-weight: 700;
-        color: #1f2937;
+        font-size: 1.65rem !important;
+        font-weight: 800 !important;
+        color: #0f172a !important;
+        line-height: 1.2 !important;
     }
     .metric-hint {
-        font-size: 0.78rem;
-        color: #9ca3af;
+        font-size: 0.82rem !important;
+        font-weight: 600 !important;
+        color: #334155 !important;
+        margin-top: 4px !important;
     }
+
+    /* Streamlit Native Metric Widgets */
+    [data-testid="stMetricLabel"] p {
+        color: #1e293b !important;
+        font-weight: 800 !important;
+        font-size: 0.84rem !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.04em !important;
+        opacity: 1 !important;
+    }
+    [data-testid="stMetricValue"] div {
+        color: #0f172a !important;
+        font-weight: 800 !important;
+        font-size: 1.65rem !important;
+        opacity: 1 !important;
+    }
+
+    /* Verdict Cards (High-Contrast Solid Text on Tinted Surfaces) */
     .verdict-card {
-        border-radius: 8px;
-        padding: 16px 20px;
-        margin-bottom: 18px;
+        border-radius: 8px !important;
+        padding: 18px 22px !important;
+        margin-bottom: 20px !important;
+        box-shadow: none !important;
+        line-height: 1.5 !important;
+    }
+    .verdict-card h3 {
+        font-size: 1.25rem !important;
+        font-weight: 800 !important;
+        margin-bottom: 8px !important;
+    }
+    .verdict-card p {
+        font-size: 0.98rem !important;
+        font-weight: 600 !important;
+        line-height: 1.5 !important;
+        margin-bottom: 10px !important;
+    }
+    .verdict-card div {
+        font-size: 0.92rem !important;
+        font-weight: 600 !important;
+        line-height: 1.6 !important;
+    }
+    .verdict-card strong {
+        font-weight: 800 !important;
     }
     .verdict-nominal {
-        background-color: #f0fdf4;
-        border: 1px solid #86efac;
-        color: #166534;
+        background-color: #ecfdf5 !important;
+        border: 2px solid #16a34a !important;
+        color: #064e3b !important;
+    }
+    .verdict-nominal h3, .verdict-nominal p, .verdict-nominal div, .verdict-nominal strong {
+        color: #064e3b !important;
     }
     .verdict-anomaly {
-        background-color: #fff7ed;
-        border: 1px solid #fdba74;
-        color: #9a3412;
+        background-color: #fffbeb !important;
+        border: 2px solid #d97706 !important;
+        color: #78350f !important;
+    }
+    .verdict-anomaly h3, .verdict-anomaly p, .verdict-anomaly div, .verdict-anomaly strong {
+        color: #78350f !important;
     }
     .verdict-defect {
-        background-color: #fef2f2;
-        border: 1px solid #fca5a5;
-        color: #991b1b;
+        background-color: #fef2f2 !important;
+        border: 2px solid #dc2626 !important;
+        color: #7f1d1d !important;
     }
+    .verdict-defect h3, .verdict-defect p, .verdict-defect div, .verdict-defect strong {
+        color: #7f1d1d !important;
+    }
+
+    /* Agent Decision Timeline */
     .timeline-step {
-        background-color: #ffffff;
-        border: 1px solid #e5e7eb;
-        border-left: 4px solid #3b82f6;
-        padding: 12px 16px;
-        border-radius: 4px;
-        margin-bottom: 10px;
+        background-color: #ffffff !important;
+        border: 2px solid #cbd5e1 !important;
+        border-left: 5px solid #2563eb !important;
+        padding: 14px 18px !important;
+        border-radius: 6px !important;
+        margin-bottom: 12px !important;
+        font-size: 0.95rem !important;
+        font-weight: 500 !important;
+        color: #0f172a !important;
+        line-height: 1.5 !important;
+    }
+    .timeline-step strong {
+        color: #0f172a !important;
+        font-weight: 800 !important;
+    }
+    .timeline-step em {
+        color: #1e293b !important;
+        font-weight: 600 !important;
     }
     .tool-badge {
-        font-family: monospace;
-        font-size: 0.82rem;
-        background-color: #eff6ff;
-        color: #1d4ed8;
-        padding: 2px 6px;
-        border-radius: 4px;
-        font-weight: 600;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+        font-size: 0.86rem !important;
+        background-color: #dbeafe !important;
+        color: #1e40af !important;
+        padding: 3px 8px !important;
+        border-radius: 4px !important;
+        font-weight: 700 !important;
+        border: 1px solid #bfdbfe !important;
     }
+
+    /* Warnings and Disclaimers */
     .warning-box {
-        background-color: #fffbeb;
-        border-left: 4px solid #f59e0b;
-        padding: 12px 16px;
-        border-radius: 4px;
-        margin-bottom: 12px;
+        background-color: #fffbeb !important;
+        border: 2px solid #f59e0b !important;
+        border-left: 5px solid #d97706 !important;
+        padding: 14px 18px !important;
+        border-radius: 6px !important;
+        margin-bottom: 14px !important;
+        color: #78350f !important;
+        font-weight: 600 !important;
+        font-size: 0.92rem !important;
     }
     .disclaimer-banner {
-        background-color: #f3f4f6;
-        border: 1px solid #d1d5db;
-        border-radius: 6px;
-        padding: 10px 14px;
-        font-size: 0.85rem;
-        color: #374151;
-        margin-top: 18px;
+        background-color: #f8fafc !important;
+        border: 2px solid #94a3b8 !important;
+        border-radius: 6px !important;
+        padding: 14px 18px !important;
+        font-size: 0.88rem !important;
+        font-weight: 600 !important;
+        color: #0f172a !important;
+        margin-top: 20px !important;
+        line-height: 1.5 !important;
+    }
+
+    /* Sidebar Text & Label High-Contrast */
+    [data-testid="stSidebar"] {
+        background-color: #f8fafc !important;
+        border-right: 2px solid #e2e8f0 !important;
+    }
+    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2,
+    [data-testid="stSidebar"] h3, [data-testid="stSidebar"] h4 {
+        color: #0f172a !important;
+        font-weight: 800 !important;
+    }
+    [data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] label {
+        color: #0f172a !important;
+        font-weight: 600 !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stCaptionContainer"],
+    [data-testid="stSidebar"] .stCaption {
+        color: #334155 !important;
+        font-weight: 600 !important;
+    }
+
+    /* Widgets, Buttons, Dropdowns & Sliders */
+    [data-testid="stWidgetLabel"] label, label {
+        color: #0f172a !important;
+        font-weight: 700 !important;
+        font-size: 0.95rem !important;
+        opacity: 1 !important;
+        margin-bottom: 4px !important;
+    }
+    button[data-testid="baseButton-primary"] {
+        background-color: #1d4ed8 !important;
+        color: #ffffff !important;
+        font-weight: 700 !important;
+        font-size: 0.95rem !important;
+        border: 2px solid #1e40af !important;
+        border-radius: 6px !important;
+        box-shadow: none !important;
+        opacity: 1 !important;
+    }
+    button[data-testid="baseButton-secondary"] {
+        background-color: #ffffff !important;
+        color: #0f172a !important;
+        font-weight: 700 !important;
+        font-size: 0.95rem !important;
+        border: 2px solid #64748b !important;
+        border-radius: 6px !important;
+        box-shadow: none !important;
+        opacity: 1 !important;
+    }
+    button[data-testid="baseButton-secondary"]:hover {
+        background-color: #f1f5f9 !important;
+        border-color: #0f172a !important;
+        color: #000000 !important;
+    }
+    [data-baseweb="select"] {
+        border: 2px solid #64748b !important;
+        border-radius: 6px !important;
+    }
+    [data-baseweb="select"] * {
+        color: #0f172a !important;
+        font-weight: 600 !important;
+        opacity: 1 !important;
+    }
+    input[type="number"], input[type="text"] {
+        color: #0f172a !important;
+        font-weight: 700 !important;
+        border: 2px solid #64748b !important;
+        border-radius: 6px !important;
+    }
+    [data-testid="stSlider"] div[data-testid="stTickBarMin"],
+    [data-testid="stSlider"] div[data-testid="stTickBarMax"] {
+        color: #1e293b !important;
+        font-weight: 700 !important;
+        font-size: 0.85rem !important;
+    }
+    [data-testid="stRadio"] label span {
+        color: #0f172a !important;
+        font-weight: 600 !important;
+        font-size: 0.95rem !important;
+    }
+    [data-testid="stExpander"] details summary {
+        color: #0f172a !important;
+        font-weight: 700 !important;
+        font-size: 1.0rem !important;
+    }
+    [data-testid="stExpander"] details summary svg {
+        fill: #0f172a !important;
+    }
+    details summary {
+        color: #0f172a !important;
+        font-weight: 700 !important;
+    }
+    .stAlert p, .stAlert span, .stAlert div {
+        color: #0f172a !important;
+        font-weight: 600 !important;
+        font-size: 0.95rem !important;
+    }
+    pre, code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+        color: #0f172a !important;
+        font-weight: 600 !important;
+        font-size: 0.88rem !important;
     }
     </style>
     """,
@@ -378,9 +602,9 @@ def render_inspection_details(
             <div class="timeline-step">
                 <strong>Step {action.step_number}:</strong> <span class="tool-badge">{action.tool_name}</span><br/>
                 <em>Rationale:</em> {action.reason}<br/>
-                <details style="margin-top: 6px; font-size: 0.85rem;">
-                    <summary style="cursor: pointer; color: #4b5563;">View Parameters & Observations</summary>
-                    <pre style="background-color: #f3f4f6; padding: 8px; border-radius: 4px; margin-top: 4px;">Inputs: {action.input_params}\nObservations: {action.observation}</pre>
+                <details style="margin-top: 6px; font-size: 0.88rem;">
+                    <summary style="cursor: pointer; color: #0f172a; font-weight: 700;">View Parameters & Observations</summary>
+                    <pre style="background-color: #f1f5f9; border: 1px solid #cbd5e1; color: #0f172a; font-weight: 600; padding: 10px; border-radius: 4px; margin-top: 6px; font-size: 0.88rem;">Inputs: {action.input_params}\nObservations: {action.observation}</pre>
                 </details>
             </div>
             """,
@@ -451,17 +675,17 @@ def render_live_keyframe_panel(
 
         st.markdown(
             f"""
-            <div style="background: #1e293b; color: #f8fafc; padding: 12px 16px; border-radius: 8px; margin-bottom: 12px; border-left: 5px solid {reason_color};">
+            <div style="background: #0f172a; color: #ffffff; padding: 14px 18px; border-radius: 8px; margin-bottom: 14px; border-left: 6px solid {reason_color}; border: 2px solid #334155;">
                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
                     <div>
-                        <span style="font-weight: 700; font-size: 1.1rem;">⏱️ Live Playback Timestamp: {kf.timestamp_seconds:.2f}s</span>
-                        <span style="font-size: 0.85rem; color: #94a3b8; margin-left: 8px;">(Frame #{kf.frame_index})</span>
+                        <span style="font-weight: 800; font-size: 1.15rem; color: #ffffff;">⏱️ Live Playback Timestamp: {kf.timestamp_seconds:.2f}s</span>
+                        <span style="font-size: 0.9rem; font-weight: 700; color: #f1f5f9; margin-left: 8px;">(Frame #{kf.frame_index})</span>
                     </div>
                     <div>
-                        <span style="background: {reason_color}; color: #fff; font-size: 0.78rem; font-weight: 600; padding: 4px 8px; border-radius: 4px;">
+                        <span style="background: {reason_color}; color: #ffffff; font-size: 0.82rem; font-weight: 800; padding: 5px 10px; border-radius: 4px;">
                             TRIGGER: {reason_label}
                         </span>
-                        <span style="background: #334155; color: #cbd5e1; font-size: 0.78rem; font-weight: 600; padding: 4px 8px; border-radius: 4px; margin-left: 6px;">
+                        <span style="background: #1e293b; color: #ffffff; font-size: 0.82rem; font-weight: 800; padding: 5px 10px; border-radius: 4px; margin-left: 6px; border: 1px solid #475569;">
                             KEYFRAMES: {len(inspector.keyframes)} (Skipped: {inspector.skipped_frames_count})
                         </span>
                     </div>
@@ -494,9 +718,9 @@ def render_live_keyframe_panel(
 
         st.markdown(
             f"""
-            <div class="verdict-card {v_class}" style="margin-top: 10px; margin-bottom: 8px; padding: 10px 14px;">
-                <strong>Keyframe Verdict:</strong> {verdict_str.replace('_', ' ')} (Confidence: {kf.agent_session.final_verdict.confidence})<br/>
-                <span style="font-size: 0.88rem;">{kf.agent_session.final_verdict.summary}</span>
+            <div class="verdict-card {v_class}" style="margin-top: 12px; margin-bottom: 10px; padding: 14px 18px;">
+                <strong style="font-size: 1.05rem;">Keyframe Verdict: {verdict_str.replace('_', ' ')} (Confidence: {kf.agent_session.final_verdict.confidence})</strong><br/>
+                <div style="font-size: 0.95rem; font-weight: 600; margin-top: 4px;">{kf.agent_session.final_verdict.summary}</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -792,13 +1016,13 @@ def main():
                 st.markdown(
                     f"""
                     <div class="verdict-card {v_class}">
-                        <h3 style="margin: 0 0 6px 0;">Consolidated Verdict: {overall_verdict.replace('_', ' ')}</h3>
-                        <p style="margin: 0 0 8px 0; font-size: 0.95rem;">{summary_text}</p>
-                        <div style="font-size: 0.88rem;">
-                            • <strong>Timeline Coverage:</strong> {timeline_cov}% ({total_kf} keyframes detected, {skipped_frames} skipped identical frames)<br/>
-                            • <strong>Candidate Anomalies Flagged:</strong> {anomalies_count} keyframe(s)<br/>
-                            • <strong>Quality Defects (Blur/Exposure):</strong> {defects_count} keyframe(s)<br/>
-                            • <strong>Mean Processing Latency:</strong> {mean_latency} ms/keyframe
+                        <h3 style="margin: 0 0 8px 0; font-size: 1.25rem; font-weight: 800;">Consolidated Verdict: {overall_verdict.replace('_', ' ')}</h3>
+                        <p style="margin: 0 0 10px 0; font-size: 1.0rem; font-weight: 600; line-height: 1.5;">{summary_text}</p>
+                        <div style="font-size: 0.94rem; font-weight: 600; line-height: 1.6;">
+                            • <strong style="font-weight: 800;">Timeline Coverage:</strong> {timeline_cov}% ({total_kf} keyframes detected, {skipped_frames} skipped identical frames)<br/>
+                            • <strong style="font-weight: 800;">Candidate Anomalies Flagged:</strong> {anomalies_count} keyframe(s)<br/>
+                            • <strong style="font-weight: 800;">Quality Defects (Blur/Exposure):</strong> {defects_count} keyframe(s)<br/>
+                            • <strong style="font-weight: 800;">Mean Processing Latency:</strong> {mean_latency} ms/keyframe
                         </div>
                     </div>
                     """,
@@ -950,11 +1174,11 @@ def main():
     st.markdown(
         f"""
         <div class="verdict-card {card_class}">
-            <h3 style="margin: 0 0 6px 0;">Agent Verdict: {verdict.verdict_type.replace('_', ' ')} (Confidence: {verdict.confidence})</h3>
-            <p style="margin: 0 0 8px 0; font-size: 0.95rem;">{verdict.summary}</p>
-            <strong>Recommended Actions:</strong>
-            <ul style="margin: 4px 0 0 0; padding-left: 20px;">
-                {''.join(f'<li>{r}</li>' for r in verdict.recommended_actions)}
+            <h3 style="margin: 0 0 8px 0; font-size: 1.25rem; font-weight: 800;">Agent Verdict: {verdict.verdict_type.replace('_', ' ')} (Confidence: {verdict.confidence})</h3>
+            <p style="margin: 0 0 10px 0; font-size: 1.0rem; font-weight: 600; line-height: 1.5;">{verdict.summary}</p>
+            <strong style="font-size: 0.95rem; font-weight: 800;">Recommended Actions:</strong>
+            <ul style="margin: 6px 0 0 0; padding-left: 20px; font-weight: 600; font-size: 0.92rem; line-height: 1.6;">
+                {''.join(f'<li style="margin-bottom: 4px;">{r}</li>' for r in verdict.recommended_actions)}
             </ul>
         </div>
         """,
