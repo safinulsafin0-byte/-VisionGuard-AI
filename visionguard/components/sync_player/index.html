@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VisionGuard Synchronized Real-Time Video Inspector</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 12px;
+      border-radius: 8px;
+    }
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 900px) {
+      .main-grid { grid-template-columns: 1fr; }
+    }
+    .panel-box {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    video {
+      width: 100%;
+      max-height: 380px;
+      border-radius: 6px;
+      background: #000;
+      outline: none;
+    }
+    .controls-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding-top: 4px;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    button {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.15s ease;
+    }
+    button:hover { background: #1d4ed8; }
+    button.btn-finish { background: #059669; }
+    button.btn-finish:hover { background: #047857; }
+    button.btn-pause { background: #d97706; }
+    button.btn-pause:hover { background: #b45309; }
+    .status-badge {
+      font-size: 0.8rem;
+      padding: 4px 10px;
+      border-radius: 4px;
+      background: #334155;
+      color: #cbd5e1;
+      font-family: monospace;
+      font-weight: 600;
+    }
+    .status-live { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+    .status-paused { background: #451a03; color: #fcd34d; border: 1px solid #d97706; }
+    .status-busy { background: #1e3a8a; color: #93c5fd; border: 1px solid #3b82f6; }
+
+    /* Live Inspection Panel */
+    .telemetry-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+    .telemetry-card {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      padding: 6px 10px;
+      text-align: center;
+    }
+    .telemetry-label {
+      font-size: 0.72rem;
+      color: #94a3b8;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+    .telemetry-val {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #f8fafc;
+      font-family: monospace;
+    }
+    .preview-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .preview-box {
+      background: #000;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .preview-header {
+      background: #0f172a;
+      padding: 4px 8px;
+      font-size: 0.75rem;
+      color: #94a3b8;
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+    }
+    .preview-box img {
+      width: 100%;
+      height: 180px;
+      object-fit: contain;
+      background: #000;
+    }
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+    }
+    .metric-chip {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 4px;
+      padding: 6px;
+      text-align: center;
+    }
+    .metric-chip .chip-lbl { font-size: 0.7rem; color: #94a3b8; }
+    .metric-chip .chip-val { font-size: 0.95rem; font-weight: 700; color: #38bdf8; font-family: monospace; }
+    
+    .verdict-banner {
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: 0.85rem;
+      border: 1px solid transparent;
+    }
+    .verdict-nominal { background: #064e3b; border-color: #059669; color: #ecfdf5; }
+    .verdict-anomaly { background: #451a03; border-color: #d97706; color: #fffbeb; }
+    .verdict-defect { background: #450a0a; border-color: #dc2626; color: #fef2f2; }
+
+    /* Gallery */
+    .gallery-title {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #cbd5e1;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+    .gallery-container {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 6px;
+    }
+    .gallery-item {
+      flex: 0 0 110px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 4px;
+      padding: 4px;
+      cursor: pointer;
+      transition: transform 0.1s ease, border-color 0.1s ease;
+    }
+    .gallery-item:hover {
+      border-color: #3b82f6;
+      transform: translateY(-2px);
+    }
+    .gallery-item img {
+      width: 100%;
+      height: 65px;
+      object-fit: cover;
+      border-radius: 2px;
+    }
+    .gallery-meta {
+      font-size: 0.7rem;
+      color: #cbd5e1;
+      margin-top: 2px;
+      display: flex;
+      justify-content: space-between;
+      font-family: monospace;
+    }
+    .badge-trigger {
+      display: inline-block;
+      font-size: 0.65rem;
+      font-weight: 600;
+      padding: 1px 4px;
+      border-radius: 3px;
+      background: #2563eb;
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div class="main-grid">
+    <!-- Left Column: Video Player Console -->
+    <div class="panel-box">
+      <video id="vg-video" controls playsinline crossorigin="anonymous" preload="auto"></video>
+      <div class="controls-row">
+        <div class="btn-group">
+          <button id="btn-start" type="button">▶ Start Inspection & Play</button>
+          <button id="btn-pause" class="btn-pause" type="button" style="display:none;">⏸ Pause</button>
+          <button id="btn-finish" class="btn-finish" type="button">🏁 Finish Inspection</button>
+        </div>
+        <div class="btn-group">
+          <span id="sync-status" class="status-badge">READY TO INSPECT</span>
+          <span id="time-display" class="status-badge">0.00s / 0.00s</span>
+        </div>
+      </div>
+
+      <!-- Keyframe Gallery Preview -->
+      <div class="gallery-title">🖼️ Detected Keyframes (<span id="keyframe-count">0</span>)</div>
+      <div id="gallery-container" class="gallery-container">
+        <div style="font-size:0.8rem; color:#64748b; padding:10px;">Keyframes will appear progressively during playback...</div>
+      </div>
+    </div>
+
+    <!-- Right Column: Live Inspection Dashboard -->
+    <div class="panel-box">
+      <!-- Telemetry Row -->
+      <div class="telemetry-row">
+        <div class="telemetry-card">
+          <div class="telemetry-label">Analyzed</div>
+          <div id="tel-analyzed" class="telemetry-val">0</div>
+        </div>
+        <div class="telemetry-card">
+          <div class="telemetry-label">Dropped</div>
+          <div id="tel-dropped" class="telemetry-val">0</div>
+        </div>
+        <div class="telemetry-card">
+          <div class="telemetry-label">Latency</div>
+          <div id="tel-latency" class="telemetry-val">0 ms</div>
+        </div>
+        <div class="telemetry-card">
+          <div class="telemetry-label">Queue</div>
+          <div id="tel-queue" class="telemetry-val" style="font-size:0.9rem; color:#10b981;">IDLE</div>
+        </div>
+      </div>
+
+      <!-- Live Split Preview: Current Video Frame vs OpenCV Candidate Annotations -->
+      <div class="preview-row">
+        <div class="preview-box">
+          <div class="preview-header">
+            <span>Live Video Frame</span>
+            <span id="lbl-live-t">t = 0.00s</span>
+          </div>
+          <img id="img-live-raw" alt="Awaiting video playback..." src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='240' fill='%231e293b'><text x='50%' y='50%' fill='%23475569' dominant-baseline='middle' text-anchor='middle'>Playback Awaiting</text></svg>">
+        </div>
+        <div class="preview-box">
+          <div class="preview-header">
+            <span>OpenCV 5 Detection</span>
+            <span id="lbl-trigger" class="badge-trigger">TRIGGER</span>
+          </div>
+          <img id="img-live-annotated" alt="Awaiting detection..." src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='240' fill='%231e293b'><text x='50%' y='50%' fill='%23475569' dominant-baseline='middle' text-anchor='middle'>Awaiting Analysis</text></svg>">
+        </div>
+      </div>
+
+      <!-- Measured Heuristic Metrics -->
+      <div class="metrics-grid">
+        <div class="metric-chip">
+          <div class="chip-lbl">Sharpness (Laplacian)</div>
+          <div id="m-sharp" class="chip-val">--</div>
+        </div>
+        <div class="metric-chip">
+          <div class="chip-lbl">Brightness (Mean)</div>
+          <div id="m-bright" class="chip-val">--</div>
+        </div>
+        <div class="metric-chip">
+          <div class="chip-lbl">Contrast (RMS)</div>
+          <div id="m-contrast" class="chip-val">--</div>
+        </div>
+        <div class="metric-chip">
+          <div class="chip-lbl">Canny Edges</div>
+          <div id="m-edges" class="chip-val">--</div>
+        </div>
+      </div>
+
+      <!-- Agent Verdict Banner -->
+      <div id="verdict-banner" class="verdict-banner verdict-nominal" style="display:none;">
+        <div style="font-weight: 700; font-size: 0.95rem; margin-bottom: 2px;">
+          Verdict: <span id="v-title">NOMINAL CLEAR</span> (<span id="v-conf">HIGH</span>)
+        </div>
+        <div id="v-summary" style="font-size: 0.8rem;"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Component communication with Streamlit
+    function sendValueToStreamlit(value) {
+      window.parent.postMessage({
+        isStreamlitMessage: true,
+        type: "streamlit:setComponentValue",
+        value: value
+      }, "*");
+    }
+
+    function setFrameHeight() {
+      window.parent.postMessage({
+        isStreamlitMessage: true,
+        type: "streamlit:setFrameHeight",
+        height: document.body.scrollHeight + 30
+      }, "*");
+    }
+
+    const video = document.getElementById("vg-video");
+    const btnStart = document.getElementById("btn-start");
+    const btnPause = document.getElementById("btn-pause");
+    const btnFinish = document.getElementById("btn-finish");
+    const syncStatus = document.getElementById("sync-status");
+    const timeDisplay = document.getElementById("time-display");
+
+    const telAnalyzed = document.getElementById("tel-analyzed");
+    const telDropped = document.getElementById("tel-dropped");
+    const telLatency = document.getElementById("tel-latency");
+    const telQueue = document.getElementById("tel-queue");
+
+    const imgLiveRaw = document.getElementById("img-live-raw");
+    const imgLiveAnnotated = document.getElementById("img-live-annotated");
+    const lblLiveT = document.getElementById("lbl-live-t");
+    const lblTrigger = document.getElementById("lbl-trigger");
+
+    const mSharp = document.getElementById("m-sharp");
+    const mBright = document.getElementById("m-bright");
+    const mContrast = document.getElementById("m-contrast");
+    const mEdges = document.getElementById("m-edges");
+
+    const verdictBanner = document.getElementById("verdict-banner");
+    const vTitle = document.getElementById("v-title");
+    const vConf = document.getElementById("v-conf");
+    const vSummary = document.getElementById("v-summary");
+    const galleryContainer = document.getElementById("gallery-container");
+    const keyframeCount = document.getElementById("keyframe-count");
+
+    // Internal sampling & async queue state
+    let apiPort = 8505;
+    let apiBaseUrl = "http://127.0.0.1:8505";
+    let isInspecting = false;
+    let lastSampledTime = -999.0;
+    let syncCadenceSeconds = 0.5;
+    let visualChangeThreshold = 12.0;
+    let activeThresholds = null;
+    let currentFilename = "video.mp4";
+    let currentLoadedSrc = "";
+
+    let isBackendBusy = false;
+    let processedCount = 0;
+    let droppedCount = 0;
+    let collectedKeyframes = [];
+    let rvfcHandle = null;
+
+    // Off-screen canvas for frame capture
+    const captureCanvas = document.createElement("canvas");
+    const captureCtx = captureCanvas.getContext("2d");
+
+    function formatTime(sec) {
+      return (sec || 0).toFixed(2) + "s";
+    }
+
+    function updateTimeDisplay() {
+      timeDisplay.innerText = formatTime(video.currentTime) + " / " + formatTime(video.duration);
+    }
+
+    function updateTelemetryCounters() {
+      telAnalyzed.innerText = processedCount;
+      telDropped.innerText = droppedCount;
+      keyframeCount.innerText = collectedKeyframes.length;
+    }
+
+    function setQueueBadge(text, color) {
+      telQueue.innerText = text;
+      telQueue.style.color = color;
+    }
+
+    // Core async frame capture and real-time backend dispatch
+    function sampleFrameIfDue(currentTime, forceInspect = false) {
+      if (!isInspecting || video.paused || video.ended) return;
+
+      const isSeek = Math.abs(currentTime - lastSampledTime) > 1.2 && lastSampledTime >= 0;
+      const timeElapsed = currentTime - lastSampledTime;
+
+      if (!forceInspect && !isSeek && timeElapsed < syncCadenceSeconds) {
+        return;
+      }
+
+      // Check bounded queue to ensure slow inference does NOT freeze or lag player
+      if (isBackendBusy) {
+        droppedCount++;
+        setQueueBadge("BUSY", "#f59e0b");
+        updateTelemetryCounters();
+        return;
+      }
+
+      try {
+        const w = Math.min(video.videoWidth || 640, 640);
+        const aspect = (video.videoHeight || 480) / (video.videoWidth || 640);
+        const h = Math.round(w * aspect);
+        captureCanvas.width = w;
+        captureCanvas.height = h;
+        captureCtx.drawImage(video, 0, 0, w, h);
+
+        const frameDataUrl = captureCanvas.toDataURL("image/jpeg", 0.78);
+        isBackendBusy = true;
+        lastSampledTime = currentTime;
+        setQueueBadge("INSPECTING", "#3b82f6");
+
+        // Immediately show the captured raw frame in the UI
+        imgLiveRaw.src = frameDataUrl;
+        lblLiveT.innerText = `t = ${currentTime.toFixed(2)}s`;
+
+        const payload = {
+          timestamp: currentTime,
+          frame_data: frameDataUrl,
+          visual_change_threshold: visualChangeThreshold,
+          force_inspect: isSeek || forceInspect,
+          thresholds: activeThresholds
+        };
+
+        const t0 = performance.now();
+        fetch(`${apiBaseUrl}/api/analyze_frame`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        })
+        .then(res => {
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          return res.json();
+        })
+        .then(data => {
+          isBackendBusy = false;
+          setQueueBadge("IDLE", "#10b981");
+
+          if (data.status === "success") {
+            processedCount++;
+            telLatency.innerText = `${data.processing_latency_ms} ms`;
+            collectedKeyframes.push(data);
+
+            renderLiveDetection(data);
+            appendKeyframeToGallery(data);
+            updateTelemetryCounters();
+          }
+        })
+        .catch(err => {
+          isBackendBusy = false;
+          setQueueBadge("ERR", "#ef4444");
+        });
+
+      } catch (err) {
+        setQueueBadge("CORS ERR", "#ef4444");
+      }
+    }
+
+    // Modern requestVideoFrameCallback loop with fallback
+    function scheduleNextFrame() {
+      if (!isInspecting || video.paused || video.ended) return;
+
+      if ("requestVideoFrameCallback" in HTMLVideoElement.prototype) {
+        rvfcHandle = video.requestVideoFrameCallback((now, metadata) => {
+          const t = metadata.mediaTime !== undefined ? metadata.mediaTime : video.currentTime;
+          updateTimeDisplay();
+          sampleFrameIfDue(t);
+          scheduleNextFrame();
+        });
+      } else {
+        updateTimeDisplay();
+        sampleFrameIfDue(video.currentTime);
+        rvfcHandle = requestAnimationFrame(scheduleNextFrame);
+      }
+    }
+
+    function renderLiveDetection(data) {
+      if (data.annotated_frame) {
+        imgLiveAnnotated.src = data.annotated_frame;
+      }
+      lblTrigger.innerText = data.selection_reason.replace(/_/g, " ");
+
+      if (data.metrics) {
+        mSharp.innerText = data.metrics.laplacian_variance.toFixed(1);
+        mBright.innerText = data.metrics.mean_brightness.toFixed(1);
+        mContrast.innerText = data.metrics.rms_contrast.toFixed(1);
+        mEdges.innerText = (data.metrics.canny_edge_density * 100).toFixed(1) + "%";
+      }
+
+      verdictBanner.style.display = "block";
+      const v = data.verdict || "NOMINAL_CLEAR";
+      vTitle.innerText = v.replace(/_/g, " ");
+      vConf.innerText = data.confidence || "HIGH";
+      vSummary.innerText = data.summary || "";
+
+      verdictBanner.className = "verdict-banner " + (
+        v === "NOMINAL_CLEAR" ? "verdict-nominal" :
+        v === "ANOMALOUS_CANDIDATE_FLAGGED" ? "verdict-anomaly" : "verdict-defect"
+      );
+    }
+
+    function appendKeyframeToGallery(data) {
+      // Clear placeholder if first keyframe
+      if (collectedKeyframes.length === 1) {
+        galleryContainer.innerHTML = "";
+      }
+
+      const item = document.createElement("div");
+      item.className = "gallery-item";
+      item.innerHTML = `
+        <img src="${data.annotated_frame || imgLiveRaw.src}" alt="Keyframe">
+        <div class="gallery-meta">
+          <span>${data.timestamp_seconds.toFixed(2)}s</span>
+          <span style="color:${data.verdict === 'NOMINAL_CLEAR' ? '#10b981' : '#f59e0b'}">
+            ${data.verdict === 'NOMINAL_CLEAR' ? 'OK' : 'FLAG'}
+          </span>
+        </div>
+      `;
+      item.addEventListener("click", () => {
+        renderLiveDetection(data);
+      });
+      galleryContainer.appendChild(item);
+      galleryContainer.scrollLeft = galleryContainer.scrollWidth;
+    }
+
+    function finalizeInspection() {
+      isInspecting = false;
+      video.pause();
+      btnPause.style.display = "none";
+      btnStart.style.display = "inline-flex";
+      btnStart.innerText = "▶ Re-inspect Video";
+      syncStatus.className = "status-badge";
+      syncStatus.innerText = "✓ COMPLETED";
+
+      setQueueBadge("COMPILING REPORT", "#3b82f6");
+
+      const compilePayload = {
+        filename: currentFilename,
+        duration: video.duration || video.currentTime,
+        fps: 25.0,
+        total_sampled: processedCount + droppedCount,
+        dropped_frames: droppedCount
+      };
+
+      fetch(`${apiBaseUrl}/api/compile_report`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(compilePayload)
+      })
+      .then(res => res.json())
+      .then(report => {
+        setQueueBadge("READY", "#10b981");
+        sendValueToStreamlit({
+          action: "CONSOLIDATED_REPORT_COMPILED",
+          report: report,
+          totalKeyframes: collectedKeyframes.length,
+          droppedFrames: droppedCount
+        });
+      })
+      .catch(err => {
+        setQueueBadge("COMPILE ERROR", "#ef4444");
+      });
+    }
+
+    btnStart.addEventListener("click", () => {
+      isInspecting = true;
+      btnStart.style.display = "none";
+      btnPause.style.display = "inline-flex";
+      syncStatus.className = "status-badge status-live";
+      syncStatus.innerText = "● REAL-TIME LIVE";
+
+      // Reset backend tracking session
+      fetch(`${apiBaseUrl}/api/reset`, { method: "POST" }).catch(() => {});
+      collectedKeyframes = [];
+      processedCount = 0;
+      droppedCount = 0;
+      lastSampledTime = -999.0;
+      galleryContainer.innerHTML = "";
+      updateTelemetryCounters();
+
+      video.play().catch(e => console.log("Play error:", e));
+      scheduleNextFrame();
+    });
+
+    btnPause.addEventListener("click", () => {
+      isInspecting = false;
+      video.pause();
+      btnPause.style.display = "none";
+      btnStart.style.display = "inline-flex";
+      btnStart.innerText = "▶ Resume Inspection";
+      syncStatus.className = "status-badge status-paused";
+      syncStatus.innerText = "❚❚ PAUSED";
+      setQueueBadge("PAUSED", "#f59e0b");
+    });
+
+    btnFinish.addEventListener("click", finalizeInspection);
+    video.addEventListener("ended", finalizeInspection);
+
+    video.addEventListener("seeking", () => {
+      updateTimeDisplay();
+    });
+
+    video.addEventListener("seeked", () => {
+      updateTimeDisplay();
+      if (isInspecting) {
+        sampleFrameIfDue(video.currentTime, true);
+      }
+    });
+
+    video.addEventListener("loadedmetadata", () => {
+      updateTimeDisplay();
+      setFrameHeight();
+    });
+
+    // Handle render parameters from Streamlit
+    window.addEventListener("message", (event) => {
+      if (event.data && event.data.type === "streamlit:render") {
+        const args = event.data.args || {};
+        if (args.api_port) {
+          apiPort = args.api_port;
+          apiBaseUrl = `http://127.0.0.1:${apiPort}`;
+        }
+        if (args.sync_interval_sec) {
+          syncCadenceSeconds = Math.max(0.2, parseFloat(args.sync_interval_sec));
+        }
+        if (args.visual_change_thresh) {
+          visualChangeThreshold = Math.max(2.0, parseFloat(args.visual_change_thresh));
+        }
+        if (args.thresholds) {
+          activeThresholds = args.thresholds;
+        }
+        if (args.filename) {
+          currentFilename = args.filename;
+        }
+        if (args.video_src && currentLoadedSrc !== args.video_src) {
+          currentLoadedSrc = args.video_src;
+          video.src = args.video_src;
+          video.load();
+        }
+        setFrameHeight();
+      }
+    });
+
+    window.parent.postMessage({ isStreamlitMessage: true, type: "streamlit:componentReady", apiVersion: 1 }, "*");
+    setTimeout(setFrameHeight, 200);
+  </script>
+</body>
+</html>
