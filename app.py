@@ -397,7 +397,6 @@ st.markdown(
 def render_sidebar() -> Tuple[InspectionThresholds, str, float, float]:
     with st.sidebar:
         st.markdown("### 🔍 VisionGuard AI")
-        st.caption(f"OpenCV Engine: **v{cv2.__version__}** | Python {platform.python_version()}")
         st.divider()
 
         st.markdown("#### Input Source")
